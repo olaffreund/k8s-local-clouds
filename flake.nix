@@ -7,7 +7,6 @@
   };
 
   outputs = {
-    self,
     nixpkgs,
     flake-utils,
     ...
@@ -197,6 +196,53 @@
 
         echo "✅ Crossplane resources deployed successfully!"
       '';
+
+      # New script for deploying ArgoCD resources
+      argocdDeployScript = pkgs.writeShellScriptBin "argocd-deploy" ''
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        echo "🚀 Deploying ArgoCD resources..."
+
+        # Check if namespace exists, if not create it
+        if ! kubectl get namespace argocd &>/dev/null; then
+          echo "Creating argocd namespace..."
+          kubectl apply -f deployment/argocd/namespace.yaml
+        fi
+
+        # Deploy ArgoCD resources
+        echo "Applying ArgoCD operator configuration..."
+        kubectl apply -f deployment/argocd/operator.yaml
+
+        # Wait for operator to initialize
+        echo "Waiting for ArgoCD operator to initialize (this may take a moment)..."
+        sleep 5
+
+        # Apply ArgoCD instance configuration
+        echo "Applying ArgoCD instance configuration..."
+        kubectl apply -f deployment/argocd/argocd.yaml
+
+        # Ask if user wants to deploy the sample application
+        read -p "Do you want to deploy the sample application? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+          echo "Applying sample application..."
+          kubectl apply -f deployment/argocd/sample-app.yaml
+        fi
+
+        # Print information about accessing ArgoCD
+        echo ""
+        echo "✅ ArgoCD deployed successfully!"
+        echo ""
+        echo "To access the ArgoCD UI, run:"
+        echo "kubectl port-forward svc/argocd-server -n argocd 8080:80"
+        echo ""
+        echo "Then visit: http://localhost:8080"
+        echo ""
+        echo "Default username: admin"
+        echo "To get the password, run:"
+        echo "kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d"
+      '';
     in {
       # Expose the scripts as packages
       packages = {
@@ -205,9 +251,10 @@
         test = testScript;
         cleanup = cleanupScript;
         crossplane-deploy = crossplaneDeployScript;
+        argocd-deploy = argocdDeployScript;
         default = pkgs.symlinkJoin {
           name = "k8s-tools";
-          paths = [buildScript deployScript testScript cleanupScript crossplaneDeployScript];
+          paths = [buildScript deployScript testScript cleanupScript crossplaneDeployScript argocdDeployScript];
         };
       };
 
@@ -218,6 +265,7 @@
         test = flake-utils.lib.mkApp {drv = testScript;};
         cleanup = flake-utils.lib.mkApp {drv = cleanupScript;};
         crossplane-deploy = flake-utils.lib.mkApp {drv = crossplaneDeployScript;};
+        argocd-deploy = flake-utils.lib.mkApp {drv = argocdDeployScript;};
         default = flake-utils.lib.mkApp {drv = deployScript;};
       };
 
@@ -251,6 +299,7 @@
           testScript
           cleanupScript
           crossplaneDeployScript
+          argocdDeployScript
         ];
 
         shellHook = ''
@@ -260,6 +309,8 @@
                     echo "  - minikube dashboard    # Open Kubernetes dashboard"
                     echo "  - kubectl get pods      # List running pods"
                     echo "  - k9s                   # Terminal UI for Kubernetes"
+                    echo "  - kubectx               # Context switcher for Kubernetes"
+                    echo "  - stern                 # Log tailing for Kubernetes pods"
                     echo ""
                     echo "Build, Deploy & Test commands:"
                     echo "  - k8s-build [app_path]  # Build container for app (default: ./apps/demo)"
@@ -267,6 +318,7 @@
                     echo "  - k8s-test [service]    # Test service connectivity (default: demo-app-svc)"
                     echo "  - k8s-cleanup [resource]# Clean up all or specific resources"
                     echo "  - crossplane-deploy     # Deploy Crossplane resources to cloud providers"
+                    echo "  - argocd-deploy         # Deploy ArgoCD resources"
                     echo ""
                     echo "Your deployment configurations are in the ./deployment directory"
 
@@ -337,6 +389,42 @@
                       echo "You can check the status with: kubectl get providers"
                     }
 
+                    # Function to set up ArgoCD
+                    function setup-argocd() {
+                      echo "🔌 Setting up ArgoCD GitOps controller..."
+
+                      # Check if ArgoCD namespace exists, create if not
+                      if ! kubectl get namespace argocd &>/dev/null; then
+                        echo "Creating ArgoCD namespace..."
+                        kubectl apply -f deployment/argocd/namespace.yaml
+                      fi
+
+                      # Apply ArgoCD configurations
+                      echo "Installing ArgoCD operator..."
+                      kubectl apply -f deployment/argocd/operator.yaml
+
+                      # Wait for operator to initialize
+                      echo "Waiting for ArgoCD operator to initialize..."
+                      sleep 10
+
+                      # Install ArgoCD instance
+                      echo "Creating ArgoCD instance..."
+                      kubectl apply -f deployment/argocd/argocd.yaml
+
+                      # Wait for ArgoCD to be ready
+                      echo "⏳ Waiting for ArgoCD server to become ready..."
+                      kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd || true
+
+                      echo "✅ ArgoCD is now installed!"
+                      echo ""
+                      echo "To access the ArgoCD UI:"
+                      echo "kubectl port-forward svc/argocd-server -n argocd 8080:80"
+                      echo ""
+                      echo "Then visit: http://localhost:8080"
+                      echo "Default username: admin"
+                      echo "To get the password: kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d"
+                    }
+
                     # Function for full workflow
                     function k8s-workflow() {
                       echo "📋 Running complete workflow: build → deploy → test"
@@ -353,9 +441,11 @@
                     # Export the functions
                     export -f setup-minikube
                     export -f setup-crossplane-providers
+                    export -f setup-argocd
                     export -f k8s-workflow
                     echo "Run 'setup-minikube' to configure your minikube cluster with Crossplane"
                     echo "Run 'setup-crossplane-providers' to install cloud providers for Crossplane"
+                    echo "Run 'setup-argocd' to install ArgoCD GitOps controller"
                     echo "Run 'k8s-workflow [app_path] [service_name]' for the full build-deploy-test workflow"
         '';
       };

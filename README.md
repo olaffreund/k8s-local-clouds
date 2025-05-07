@@ -23,8 +23,8 @@ setup-minikube
 4. Apply the Kubernetes configurations:
 ```bash
 kubectl apply -f deployment/namespace.yaml
-kubectl apply -f deployment/demo-app.yaml
-kubectl apply -f deployment/ingress.yaml
+kubectl apply -f deployment/simple-demo/
+kubectl apply -f deployment/argocd/
 ```
 
 5. Add the demo-app.local hostname to your /etc/hosts file:
@@ -42,6 +42,7 @@ echo "$(minikube ip) demo-app.local" | sudo tee -a /etc/hosts
 - `minikube dashboard` - Open the Kubernetes dashboard
 - `k9s` - Start the terminal-based Kubernetes UI
 - `crossplane-deploy` - Deploy Crossplane resources to cloud providers
+- `argocd-deploy` - Deploy ArgoCD to Kubernetes cluster
 
 ## Directory Structure
 
@@ -55,6 +56,11 @@ echo "$(minikube ip) demo-app.local" | sudo tee -a /etc/hosts
   - `/database` - Database (PostgreSQL) deployment
   - `/redis` - Redis cache deployment
   - `/nginx` - Web server deployment
+  - `/argocd` - ArgoCD GitOps deployment
+    - `namespace.yaml` - ArgoCD namespace definition
+    - `operator.yaml` - ArgoCD operator configuration
+    - `argocd.yaml` - ArgoCD instance configuration
+    - `sample-app.yaml` - Example application configuration
   - `/crossplane` - Crossplane resources for multi-cloud deployments
     - `/core` - Core Crossplane components
     - `/providers` - Cloud provider configurations (AWS, Azure, GCP)
@@ -64,6 +70,7 @@ echo "$(minikube ip) demo-app.local" | sudo tee -a /etc/hosts
       - `/gcp` - GCP resource definitions (Compute, CloudSQL, Storage)
 
 - `/tests` - Contains test scripts for all deployments
+  - `test-argocd-svc.sh` - Tests for the ArgoCD deployment
   - `test-demo-app-svc.sh` - Tests for the simple demo app
   - `test-nginx-web-svc.sh` - Tests for the Nginx web server
   - `test-postgres-svc.sh` - Tests for the PostgreSQL database
@@ -96,6 +103,17 @@ kubectl apply -f deployment/redis/redis.yaml
 kubectl apply -f deployment/nginx/nginx.yaml
 ```
 
+#### ArgoCD GitOps Controller
+```bash
+# Apply ArgoCD namespace and deployment
+kubectl apply -f deployment/argocd/namespace.yaml
+kubectl apply -f deployment/argocd/operator.yaml
+kubectl apply -f deployment/argocd/argocd.yaml
+
+# Deploy sample application through ArgoCD (optional)
+kubectl apply -f deployment/argocd/sample-app.yaml
+```
+
 You can also use the flake-provided deploy script:
 ```bash
 # Deploy everything
@@ -105,6 +123,7 @@ k8s-deploy
 k8s-deploy database/postgres
 k8s-deploy redis/redis
 k8s-deploy nginx/nginx
+k8s-deploy argocd
 ```
 
 ### Multi-Cloud Resources with Crossplane
@@ -152,6 +171,60 @@ The resources defined in the deployment manifests include:
 - **AWS**: EC2 instances, RDS databases, S3 buckets
 - **Azure**: Virtual machines, PostgreSQL servers, Storage accounts
 - **GCP**: Compute instances, Cloud SQL instances, Storage buckets
+
+### GitOps with ArgoCD
+
+This repository includes ArgoCD support for GitOps-based deployments.
+
+#### Accessing ArgoCD UI
+
+After deploying ArgoCD:
+
+```bash
+# Port forward to access ArgoCD UI
+kubectl port-forward svc/argocd-server -n argocd 8080:80
+```
+
+Then access the ArgoCD UI at http://localhost:8080
+
+The default admin credentials:
+- Username: admin
+- Password: Get the password with:
+  ```bash
+  kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+  ```
+
+#### Configuring Applications in ArgoCD
+
+You can define and deploy applications using the sample format:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/yourusername/my-repo.git
+    targetRevision: HEAD
+    path: path/to/manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: target-namespace
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+```
+
+#### Testing ArgoCD Deployment
+
+```bash
+# Test the ArgoCD deployment
+./tests/test-argocd-svc.sh
+```
 
 ### Accessing the Applications
 
@@ -217,6 +290,9 @@ Connect using:
 The repository includes test scripts for all deployments in the `/tests` directory:
 
 ```bash
+# Test the ArgoCD deployment
+./tests/test-argocd-svc.sh
+
 # Test the demo application
 ./tests/test-demo-app-svc.sh
 
@@ -233,6 +309,7 @@ The repository includes test scripts for all deployments in the `/tests` directo
 You can also use the flake-provided test script:
 ```bash
 # Test specific service
+k8s-test argocd-svc
 k8s-test nginx-web-svc
 k8s-test postgres-svc
 k8s-test redis-svc
