@@ -1,5 +1,73 @@
 # Kubernetes Local Development Environment
 
+## Using Flake.nix Remotely
+
+This repository's flake.nix configuration can be used remotely for deploying, building, and testing your Kubernetes resources without needing a local clone.
+
+### Remote Usage Options
+
+1. **Run specific commands directly from the repository URL:**
+   ```bash
+   nix run github:your-username/k8s-local-clouds#deploy
+   nix run github:your-username/k8s-local-clouds#build
+   nix run github:your-username/k8s-local-clouds#test
+   nix run github:your-username/k8s-local-clouds#crossplane-deploy
+   nix run github:your-username/k8s-local-clouds#argocd-deploy
+   nix run github:your-username/k8s-local-clouds#cleanup
+   ```
+
+2. **Use in CI/CD pipelines:**
+   ```yaml
+   # Example GitHub Actions workflow step
+   - name: Deploy Kubernetes resources
+     run: nix run github:your-username/k8s-local-clouds#deploy
+   
+   # Deploy specific cloud provider resources
+   - name: Deploy AWS resources
+     run: nix run github:your-username/k8s-local-clouds#crossplane-deploy -- aws
+   ```
+
+3. **Create a remote development environment:**
+   ```bash
+   nix develop github:your-username/k8s-local-clouds
+   ```
+
+4. **Reference in another project's flake.nix:**
+   ```nix
+   {
+     inputs = {
+       nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+       k8s-local-clouds.url = "github:your-username/k8s-local-clouds";
+     };
+   
+     outputs = { self, nixpkgs, k8s-local-clouds, ... }: {
+       # Use the remote flake's apps and packages here
+     };
+   }
+   ```
+
+### Example Remote Workflow
+
+```bash
+# Start with a development shell from the remote flake
+nix develop github:your-username/k8s-local-clouds
+
+# Set up minikube with Crossplane
+setup-minikube
+
+# Deploy Kubernetes resources
+k8s-deploy
+
+# Deploy cloud resources (AWS only)
+crossplane-deploy aws
+
+# Set up ArgoCD
+argocd-deploy
+
+# Test a specific service
+k8s-test demo-app-svc
+```
+
 This repository provides a Nix-based development environment for local Kubernetes development using minikube.
 
 ## Prerequisites
