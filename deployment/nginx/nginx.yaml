@@ -1,0 +1,180 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: local-apps
+  labels:
+    app: nginx-web
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name localhost;
+
+        location / {
+            root   /usr/share/nginx/html;
+            index  index.html index.htm;
+        }
+
+        # Simple status endpoint that shows DB connectivity
+        location /status {
+            default_type application/json;
+            return 200 '{"status":"ok","database":"postgres-svc:5432","cache":"redis-svc:6379"}';
+        }
+
+        # Health check endpoint
+        location /health {
+            default_type application/json;
+            return 200 '{"status":"healthy"}';
+        }
+
+        error_page   500 502 503 504  /50x.html;
+        location = /50x.html {
+            root   /usr/share/nginx/html;
+        }
+    }
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <title>Welcome to Kubernetes Demo</title>
+    <style>
+        body {
+            width: 35em;
+            margin: 0 auto;
+            font-family: Arial, sans-serif;
+            line-height: 1.5;
+        }
+        h1 {
+            color: #333;
+        }
+        .container {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f4f4f4;
+            border-radius: 5px;
+        }
+        pre {
+            background: #eee;
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+    </head>
+    <body>
+    <h1>Welcome to Kubernetes Demo</h1>
+    <p>If you see this page, the Nginx web server is successfully installed and
+    working in your Kubernetes cluster.</p>
+
+    <div class="container">
+        <h2>Connected Services:</h2>
+        <pre>
+Database: PostgreSQL at postgres-svc:5432
+Cache: Redis at redis-svc:6379
+        </pre>
+        <p>Check the status endpoint at <a href="/status">/status</a></p>
+    </div>
+    
+    <p>For online documentation and support please refer to
+    <a href="http://nginx.org/">nginx.org</a>.</p>
+
+    </body>
+    </html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-web
+  namespace: local-apps
+  labels:
+    app: nginx-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx-web
+  template:
+    metadata:
+      labels:
+        app: nginx-web
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
+        - name: nginx-content
+          mountPath: /usr/share/nginx/html/index.html
+          subPath: index.html
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        resources:
+          limits:
+            cpu: "0.2"
+            memory: "128Mi"
+          requests:
+            cpu: "0.1"
+            memory: "64Mi"
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: nginx-config
+          items:
+            - key: default.conf
+              path: default.conf
+      - name: nginx-content
+        configMap:
+          name: nginx-config
+          items:
+            - key: index.html
+              path: index.html
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-web-svc
+  namespace: local-apps
+  labels:
+    app: nginx-web
+spec:
+  selector:
+    app: nginx-web
+  ports:
+  - port: 80
+    targetPort: 80
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-web-ingress
+  namespace: local-apps
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: web-app.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx-web-svc
+            port:
+              number: 80
