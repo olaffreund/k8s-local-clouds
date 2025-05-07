@@ -69,8 +69,8 @@ data:
     <div class="container">
         <h2>Connected Services:</h2>
         <pre>
-Database: PostgreSQL at postgres-svc:5432
-Cache: Redis at redis-svc:6379
+    "Database": PostgreSQL at postgres-svc:5432
+    "Cache": Redis at redis-svc:6379
         </pre>
         <p>Check the status endpoint at <a href="/status">/status</a></p>
     </div>
