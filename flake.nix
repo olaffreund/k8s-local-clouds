@@ -142,6 +142,61 @@
 
         echo "✅ Cleanup completed!"
       '';
+
+      # New script for deploying Crossplane resources
+      crossplaneDeployScript = pkgs.writeShellScriptBin "crossplane-deploy" ''
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        echo "🚀 Deploying Crossplane resources..."
+
+        # Check if namespace exists, if not create it
+        if ! kubectl get namespace crossplane-system &>/dev/null; then
+          echo "Creating crossplane-system namespace..."
+          kubectl apply -f deployment/crossplane/core/namespace.yaml
+        fi
+
+        # Deploy specific resources or all if no arguments provided
+        if [ $# -eq 0 ]; then
+          echo "Deploying all Crossplane resources..."
+
+          # First apply providers
+          echo "Applying Crossplane providers..."
+          kubectl apply -f deployment/crossplane/providers/
+
+          # Wait for providers to be healthy
+          echo "Waiting for providers to be ready (this may take a while)..."
+          sleep 10
+
+          # Then apply resources
+          echo "Applying cloud resources..."
+          kubectl apply -f deployment/crossplane/resources/aws/
+          kubectl apply -f deployment/crossplane/resources/azure/
+          kubectl apply -f deployment/crossplane/resources/gcp/
+        else
+          echo "Deploying specific Crossplane resources: $@"
+          for resource in "$@"; do
+            case "$resource" in
+              aws|AWS)
+                kubectl apply -f deployment/crossplane/resources/aws/
+                ;;
+              azure|Azure)
+                kubectl apply -f deployment/crossplane/resources/azure/
+                ;;
+              gcp|GCP)
+                kubectl apply -f deployment/crossplane/resources/gcp/
+                ;;
+              *)
+                echo "Unknown resource type: $resource"
+                echo "Available options: aws, azure, gcp"
+                exit 1
+                ;;
+            esac
+          done
+        fi
+
+        echo "✅ Crossplane resources deployed successfully!"
+      '';
     in {
       # Expose the scripts as packages
       packages = {
@@ -149,9 +204,10 @@
         deploy = deployScript;
         test = testScript;
         cleanup = cleanupScript;
+        crossplane-deploy = crossplaneDeployScript;
         default = pkgs.symlinkJoin {
           name = "k8s-tools";
-          paths = [buildScript deployScript testScript cleanupScript];
+          paths = [buildScript deployScript testScript cleanupScript crossplaneDeployScript];
         };
       };
 
@@ -161,6 +217,7 @@
         deploy = flake-utils.lib.mkApp {drv = deployScript;};
         test = flake-utils.lib.mkApp {drv = testScript;};
         cleanup = flake-utils.lib.mkApp {drv = cleanupScript;};
+        crossplane-deploy = flake-utils.lib.mkApp {drv = crossplaneDeployScript;};
         default = flake-utils.lib.mkApp {drv = deployScript;};
       };
 
@@ -185,11 +242,15 @@
           # Environment setup
           direnv
 
+          # Crossplane tools
+          crossplane-cli
+
           # Our custom scripts
           buildScript
           deployScript
           testScript
           cleanupScript
+          crossplaneDeployScript
         ];
 
         shellHook = ''
@@ -205,6 +266,7 @@
                     echo "  - k8s-deploy [resource] # Deploy all or specific resources"
                     echo "  - k8s-test [service]    # Test service connectivity (default: demo-app-svc)"
                     echo "  - k8s-cleanup [resource]# Clean up all or specific resources"
+                    echo "  - crossplane-deploy     # Deploy Crossplane resources to cloud providers"
                     echo ""
                     echo "Your deployment configurations are in the ./deployment directory"
 
@@ -238,10 +300,41 @@
                     # Function to set up minikube with default configuration
                     function setup-minikube() {
                       minikube start --driver=docker --cpus=2 --memory=4096 --disk-size=20g
+
+                      # Enable standard addons
                       minikube addons enable ingress
                       minikube addons enable metrics-server
+
+                      # Install Crossplane using Helm
+                      echo "Installing Crossplane via Helm..."
+                      helm repo add crossplane-stable https://charts.crossplane.io/stable
+                      helm repo update
+                      helm install crossplane crossplane-stable/crossplane \
+                        --namespace crossplane-system \
+                        --create-namespace \
+                        --version 1.15.0
+
+                      # Wait for Crossplane to be ready
+                      echo "Waiting for Crossplane pods to be ready..."
+                      kubectl wait --for=condition=available --timeout=300s deployment/crossplane -n crossplane-system
+
                       kubectl config use-context minikube
-                      echo "Minikube is now running and configured!"
+                      echo "Minikube is now running with Crossplane installed!"
+                    }
+
+                    # Function to set up Crossplane providers
+                    function setup-crossplane-providers() {
+                      echo "🔌 Setting up Crossplane providers..."
+
+                      # Apply core configurations first
+                      kubectl apply -f deployment/crossplane/core/crossplane.yaml
+
+                      # Install cloud providers
+                      kubectl apply -f deployment/crossplane/providers/
+
+                      echo "⏳ Waiting for Crossplane providers to become healthy..."
+                      echo "This may take a few minutes..."
+                      echo "You can check the status with: kubectl get providers"
                     }
 
                     # Function for full workflow
@@ -259,8 +352,10 @@
 
                     # Export the functions
                     export -f setup-minikube
+                    export -f setup-crossplane-providers
                     export -f k8s-workflow
-                    echo "Run 'setup-minikube' to configure your minikube cluster"
+                    echo "Run 'setup-minikube' to configure your minikube cluster with Crossplane"
+                    echo "Run 'setup-crossplane-providers' to install cloud providers for Crossplane"
                     echo "Run 'k8s-workflow [app_path] [service_name]' for the full build-deploy-test workflow"
         '';
       };

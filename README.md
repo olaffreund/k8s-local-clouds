@@ -15,7 +15,7 @@ This repository provides a Nix-based development environment for local Kubernete
 nix develop
 ```
 
-3. Setup minikube with the pre-configured settings:
+3. Setup minikube with the pre-configured settings (now includes Crossplane v1.15.0):
 ```bash
 setup-minikube
 ```
@@ -36,12 +36,18 @@ echo "$(minikube ip) demo-app.local" | sudo tee -a /etc/hosts
 
 ## Available Commands
 
-- `setup-minikube` - Initialize minikube with recommended settings
+- `setup-minikube` - Initialize minikube with recommended settings and Crossplane
+- `setup-crossplane-providers` - Set up cloud providers for Crossplane (AWS, Azure, GCP)
 - `kubectl get pods -n local-apps` - Check the status of your pods
 - `minikube dashboard` - Open the Kubernetes dashboard
 - `k9s` - Start the terminal-based Kubernetes UI
+- `crossplane-deploy` - Deploy Crossplane resources to cloud providers
 
 ## Directory Structure
+
+- `/bin` - Helper scripts for the project
+  - `deploy-crossplane.sh` - Script for deploying Crossplane to Kubernetes
+  - `update-cloud-credentials.sh` - Script for updating cloud provider credentials
 
 - `/deployment` - Contains Kubernetes deployment manifests
   - `namespace.yaml` - Defines the local-apps namespace
@@ -49,6 +55,13 @@ echo "$(minikube ip) demo-app.local" | sudo tee -a /etc/hosts
   - `/database` - Database (PostgreSQL) deployment
   - `/redis` - Redis cache deployment
   - `/nginx` - Web server deployment
+  - `/crossplane` - Crossplane resources for multi-cloud deployments
+    - `/core` - Core Crossplane components
+    - `/providers` - Cloud provider configurations (AWS, Azure, GCP)
+    - `/resources` - Resource definitions for each cloud
+      - `/aws` - AWS resource definitions (EC2, RDS, S3)
+      - `/azure` - Azure resource definitions (VMs, PostgreSQL, Storage)
+      - `/gcp` - GCP resource definitions (Compute, CloudSQL, Storage)
 
 - `/tests` - Contains test scripts for all deployments
   - `test-demo-app-svc.sh` - Tests for the simple demo app
@@ -93,6 +106,52 @@ k8s-deploy database/postgres
 k8s-deploy redis/redis
 k8s-deploy nginx/nginx
 ```
+
+### Multi-Cloud Resources with Crossplane
+
+This repository now includes Crossplane integration for deploying resources to multiple cloud providers (AWS, Azure, GCP).
+
+#### Setting Up Crossplane
+
+1. Initialize minikube with Crossplane installed:
+```bash
+setup-minikube
+```
+
+2. Set up the cloud providers (AWS, Azure, GCP):
+```bash
+setup-crossplane-providers
+```
+
+3. Update cloud credentials using the provided script:
+```bash
+./bin/update-cloud-credentials.sh
+```
+This script will help you configure credentials for your cloud providers.
+
+#### Deploying Cloud Resources
+
+You can deploy resources to specific cloud providers or all of them:
+
+```bash
+# Deploy all cloud resources
+crossplane-deploy
+
+# Deploy only AWS resources
+crossplane-deploy aws
+
+# Deploy only Azure resources
+crossplane-deploy azure
+
+# Deploy only GCP resources
+crossplane-deploy gcp
+```
+
+The resources defined in the deployment manifests include:
+
+- **AWS**: EC2 instances, RDS databases, S3 buckets
+- **Azure**: Virtual machines, PostgreSQL servers, Storage accounts
+- **GCP**: Compute instances, Cloud SQL instances, Storage buckets
 
 ### Accessing the Applications
 
@@ -198,3 +257,14 @@ k8s-workflow ./apps/demo nginx-web-svc
 ## Customizing the Environment
 
 Edit the `flake.nix` file to add more development tools as needed.
+
+## Environment Management with direnv
+
+This project uses direnv to automatically load environment variables when entering the project directory:
+
+- Kubernetes configuration points to a local `.kube/config` file
+- Minikube home is set to a project-local directory
+- Docker configuration is isolated to the project
+- Project's bin directory is added to the PATH
+
+The environment is automatically activated when entering the directory and deactivated when leaving it.
