@@ -1,0 +1,43 @@
+apiVersion: database.gcp.upbound.io/v1beta1
+kind: CloudSQLInstance
+metadata:
+  name: crossplane-gcp-postgres
+spec:
+  forProvider:
+    region: us-central1
+    databaseVersion: POSTGRES_14
+    settings:
+      - tier: db-f1-micro
+        diskSize: 10
+        diskType: PD_SSD
+        ipConfiguration:
+          - ipv4Enabled: true
+            authorizedNetworks:
+              - name: all
+                value: "0.0.0.0/0"
+        backupConfiguration:
+          - enabled: true
+            startTime: "03:00"
+            pointInTimeRecoveryEnabled: true
+        locationPreference:
+          - zone: us-central1-a
+        databaseFlags:
+          - name: max_connections
+            value: "100"
+    deletionProtection: false
+  providerConfigRef:
+    name: gcp-config
+  writeConnectionSecretToRef:
+    namespace: default
+    name: gcp-postgres-connection
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gcp-db-password
+  namespace: crossplane-system
+type: Opaque
+data:
+  # In production, use a secure password management solution
+  # For demo purposes, this is a base64-encoded string: SuperSecure123!
+  password: U3VwZXJTZWN1cmUxMjMh

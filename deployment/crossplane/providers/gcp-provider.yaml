@@ -1,0 +1,34 @@
+---
+# Install GCP Provider
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-gcp
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-gcp:v1.2.0
+---
+# GCP Secret placeholder - replace with actual credentials in production
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gcp-creds
+  namespace: crossplane-system
+type: Opaque
+data:
+  # This is a placeholder - in production, use actual credentials
+  # Generated with: echo -n 'your-credentials-json' | base64
+  creds: ewoidHlwZSI6ICJzZXJ2aWNlX2FjY291bnQiLAoicHJvamVjdF9pZCI6ICJQTEFDRUhPTERFUiIsCiJwcml2YXRlX2tleV9pZCI6ICJQTEFDRUhPTERFUiIsCiJwcml2YXRlX2tleSI6ICJQTEFDRUhPTERFUiIKfQ==
+---
+# GCP Provider Configuration
+apiVersion: gcp.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: gcp-config
+spec:
+  projectID: "your-gcp-project-id"
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: gcp-creds
+      key: creds

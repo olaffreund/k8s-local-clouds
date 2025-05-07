@@ -1,0 +1,20 @@
+apiVersion: storage.gcp.upbound.io/v1beta1
+kind: Bucket
+metadata:
+  name: crossplane-gcp-bucket
+spec:
+  forProvider:
+    location: US-CENTRAL1
+    versioning:
+      - enabled: true
+    uniformBucketLevelAccess: true
+    cors:
+      - origin: ["*"]
+        method: ["GET", "HEAD", "OPTIONS"]
+        responseHeader: ["*"]
+        maxAgeSeconds: 3600
+    labels:
+      environment: dev
+      managed-by: crossplane
+  providerConfigRef:
+    name: gcp-config

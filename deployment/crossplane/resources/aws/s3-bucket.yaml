@@ -1,0 +1,19 @@
+apiVersion: s3.aws.upbound.io/v1beta1
+kind: Bucket
+metadata:
+  name: crossplane-aws-bucket
+spec:
+  forProvider:
+    region: us-west-2
+    acl: private
+    versioning:
+      - enabled: true
+    serverSideEncryptionConfiguration:
+      - rule:
+          - applyServerSideEncryptionByDefault:
+              - sseAlgorithm: AES256
+    tags:
+      Name: crossplane-managed-bucket
+      Environment: dev
+  providerConfigRef:
+    name: aws-config

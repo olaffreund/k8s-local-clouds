@@ -1,0 +1,14 @@
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: Instance
+metadata:
+  name: crossplane-aws-vm
+spec:
+  forProvider:
+    region: us-west-2
+    ami: ami-0c65adc9a5c1b5d7c  # Amazon Linux 2023 AMI - update with current AMI
+    instanceType: t2.micro
+    tags:
+      Name: crossplane-managed-instance
+      Environment: dev
+  providerConfigRef:
+    name: aws-config

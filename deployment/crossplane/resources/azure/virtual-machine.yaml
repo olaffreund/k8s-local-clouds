@@ -1,0 +1,80 @@
+apiVersion: compute.azure.upbound.io/v1beta1
+kind: LinuxVirtualMachine
+metadata:
+  name: crossplane-azure-vm
+spec:
+  forProvider:
+    location: westeurope
+    resourceGroupName: crossplane-resources
+    size: Standard_B1s
+    osDisk:
+      - caching: ReadWrite
+        storageAccountType: Standard_LRS
+        diskSizeGb: 30
+    adminUsername: adminuser
+    adminSshKey:
+      - username: adminuser
+        publicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD... your-public-key"  # Replace with your SSH public key
+    networkInterfaceIds:
+      - "${azure.network.NetworkInterface.crossplane-azure-nic.id}"
+    sourceImageReference:
+      - publisher: Canonical
+        offer: UbuntuServer
+        sku: 18.04-LTS
+        version: latest
+    tags:
+      Environment: dev
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: azure-config
+---
+apiVersion: network.azure.upbound.io/v1beta1
+kind: NetworkInterface
+metadata:
+  name: crossplane-azure-nic
+spec:
+  forProvider:
+    location: westeurope
+    resourceGroupName: crossplane-resources
+    ipConfiguration:
+      - name: internal
+        privateIpAddressAllocation: Dynamic
+        subnetId: "${azure.network.Subnet.crossplane-azure-subnet.id}"
+  providerConfigRef:
+    name: azure-config
+---
+apiVersion: network.azure.upbound.io/v1beta1
+kind: VirtualNetwork
+metadata:
+  name: crossplane-azure-vnet
+spec:
+  forProvider:
+    location: westeurope
+    resourceGroupName: crossplane-resources
+    addressSpace:
+      - 10.0.0.0/16
+  providerConfigRef:
+    name: azure-config
+---
+apiVersion: network.azure.upbound.io/v1beta1
+kind: Subnet
+metadata:
+  name: crossplane-azure-subnet
+spec:
+  forProvider:
+    resourceGroupName: crossplane-resources
+    virtualNetworkName: "${azure.network.VirtualNetwork.crossplane-azure-vnet.name}"
+    addressPrefixes:
+      - 10.0.1.0/24
+  providerConfigRef:
+    name: azure-config
+---
+apiVersion: resources.azure.upbound.io/v1beta1
+kind: ResourceGroup
+metadata:
+  name: crossplane-resources-rg
+spec:
+  forProvider:
+    location: westeurope
+  providerConfigRef:
+    name: azure-config

@@ -1,0 +1,39 @@
+apiVersion: rds.aws.upbound.io/v1beta1
+kind: Instance
+metadata:
+  name: crossplane-aws-postgres
+spec:
+  forProvider:
+    region: us-west-2
+    engine: postgres
+    engineVersion: "14.7"
+    dbName: crossplanedb
+    username: dbadmin
+    passwordSecretRef:
+      name: aws-db-password
+      key: password
+      namespace: crossplane-system
+    instanceClass: db.t3.micro
+    allocatedStorage: 20
+    storageType: gp2
+    skipFinalSnapshot: true
+    publiclyAccessible: false
+    tags:
+      Name: crossplane-managed-db
+      Environment: dev
+  providerConfigRef:
+    name: aws-config
+  writeConnectionSecretToRef:
+    namespace: default
+    name: aws-postgres-connection
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: aws-db-password
+  namespace: crossplane-system
+type: Opaque
+data:
+  # In production, use a secure password management solution
+  # For demo purposes, this is a base64-encoded string: Chang3M3!
+  password: Q2hhbmczTTMh

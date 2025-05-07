@@ -1,0 +1,33 @@
+---
+# Install Azure Provider
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-azure
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-azure:v1.2.0
+---
+# Azure Secret placeholder - replace with actual credentials in production
+apiVersion: v1
+kind: Secret
+metadata:
+  name: azure-creds
+  namespace: crossplane-system
+type: Opaque
+data:
+  # This is a placeholder - in production, use actual credentials
+  # Generated with: echo -n 'your-credentials-json' | base64
+  creds: eyJjbGllbnRJZCI6IlBMQUNFSE9MREVSIiwiY2xpZW50U2VjcmV0IjoiUExBQ0VIT0xERVIiLCJ0ZW5hbnRJZCI6IlBMQUNFSE9MREVSIiwic3Vic2NyaXB0aW9uSWQiOiJQTEFDRUhPTERFUiJ9
+---
+# Azure Provider Configuration
+apiVersion: azure.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: azure-config
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: azure-creds
+      key: creds

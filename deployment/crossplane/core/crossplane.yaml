@@ -1,0 +1,18 @@
+apiVersion: pkg.crossplane.io/v1
+kind: Configuration
+metadata:
+  name: crossplane
+  namespace: crossplane-system
+spec:
+  package: xpkg.upbound.io/crossplane/crossplane:v1.12.1
+  revisionActivationPolicy: Automatic
+  revisionHistoryLimit: 3
+---
+# Install Crossplane Functions for Compositions
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: function-patch-and-transform
+  namespace: crossplane-system
+spec:
+  package: xpkg.crossplane.io/crossplane-contrib/function-patch-and-transform:v0.8.2

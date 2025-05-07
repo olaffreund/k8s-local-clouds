@@ -1,0 +1,33 @@
+---
+# Install AWS Provider
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-aws
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-aws:v1.2.0
+---
+# AWS Secret placeholder - replace with actual credentials in production
+apiVersion: v1
+kind: Secret
+metadata:
+  name: aws-creds
+  namespace: crossplane-system
+type: Opaque
+data:
+  # This is a placeholder - in production, use actual credentials
+  # Generated with: echo -n 'your-credentials-json' | base64
+  creds: eyJhd3NfYWNjZXNzX2tleV9pZCI6IlBMQUNFSE9MREVSIiwiYXdzX3NlY3JldF9hY2Nlc3Nfa2V5IjoiUExBQ0VIT0xERVIifQ==
+---
+# AWS Provider Configuration
+apiVersion: aws.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: aws-config
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: aws-creds
+      key: creds

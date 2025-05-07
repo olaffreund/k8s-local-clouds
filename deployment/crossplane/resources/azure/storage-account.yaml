@@ -1,0 +1,30 @@
+apiVersion: storage.azure.upbound.io/v1beta1
+kind: Account
+metadata:
+  name: crossplane-azure-storage
+spec:
+  forProvider:
+    resourceGroupName: crossplane-resources
+    location: westeurope
+    accountTier: Standard
+    accountReplicationType: LRS
+    accountKind: StorageV2
+    enableHttpsTrafficOnly: true
+    minTlsVersion: TLS1_2
+    tags:
+      Environment: dev
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: azure-config
+---
+apiVersion: storage.azure.upbound.io/v1beta1
+kind: Container
+metadata:
+  name: crossplane-azure-blob-container
+spec:
+  forProvider:
+    storageAccountName: crossplane-azure-storage
+    containerAccessType: private
+    resourceGroupName: crossplane-resources
+  providerConfigRef:
+    name: azure-config
