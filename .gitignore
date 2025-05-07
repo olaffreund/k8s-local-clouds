@@ -5,10 +5,10 @@ result
 result-*
 
 # Environment and secret files
-.env
-*.env
-.envrc
-*.envrc.local
+# .env
+# *.env
+# .envrc
+# *.envrc.local
 *.secret
 *_secret
 secrets/
